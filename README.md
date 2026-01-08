@@ -1,10 +1,51 @@
-# Claude Code 🧡 Sandbox SDK
+# Hivemind Auto-PR Bot
 
-Run Claude Code for on Cloudflare Sandboxes! This example shows a basic setup that does the following:
+A Cloudflare Worker that runs Claude Code in a sandbox to automatically implement tasks across the Hivemind frontend and backend repositories, then creates PRs.
 
-- The worker accepts POST requests that include a repository URL and a task description
-- The worker spawns a sandbox, clones the repository and starts Claude Code in headless mode with the provided task
-- Claude Code will edit all necessary files and return when done
-- The Worker will return a response with the output logs from Claude and the diff left on the repo.
+## How it works
 
-Happy hacking!
+1. Send a POST request with a task description
+2. The worker spins up a sandbox and clones both repos:
+   - `hivemind-expo` (React Native/Expo frontend)
+   - `hivemind-hono` (Hono/Bun backend)
+3. Claude Code runs autonomously to complete the task
+4. Changes are committed, pushed, and PRs are created
+
+## Usage
+
+```bash
+curl -X POST https://your-worker.workers.dev \
+  -H "Content-Type: application/json" \
+  -d '{"task": "Add dark mode support"}'
+```
+
+## Response
+
+```json
+{
+  "branchName": "sandbox/abc123",
+  "claudeLogs": "...",
+  "frontend": { "success": true, "prUrl": "https://github.com/..." },
+  "backend": { "success": true, "prUrl": "https://github.com/..." }
+}
+```
+
+## Setup
+
+1. Set environment variables in `.dev.vars`:
+
+   ```
+   ANTHROPIC_API_KEY=sk-ant-...
+   GITHUB_TOKEN=ghp_...
+   ```
+
+2. Run locally:
+
+   ```bash
+   npm run dev
+   ```
+
+3. Deploy:
+   ```bash
+   npm run deploy
+   ```
