@@ -5,6 +5,7 @@ ENV TZ="$TZ"
 ENV IS_SANDBOX=1
 
 ARG CLAUDE_CODE_VERSION=latest
+ARG GITHUB_TOKEN
 
 # Install basic development tools and iptables/ipset
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -45,7 +46,8 @@ RUN curl -fsSL https://bun.sh/install | bash
 ENV PATH="/root/.bun/bin:$PATH"
 
 # Clone hivemind-claude-code-setup for agents, commands, and templates
-RUN git clone --depth 1 https://github.com/Hivemind-Edu/hivemind-claude-code-setup.git \
+# Uses GITHUB_TOKEN build arg for private repo access
+RUN git clone --depth 1 https://oauth2:${GITHUB_TOKEN}@github.com/Hivemind-Edu/hivemind-claude-code-setup.git \
     /opt/claude-setup
 
 # Install agents and commands to /root/.claude/ (persists in image)

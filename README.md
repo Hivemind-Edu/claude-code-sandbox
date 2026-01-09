@@ -62,8 +62,10 @@ Set these in Railway:
 
 **Required:**
 ```
-GITHUB_TOKEN=ghp_...              # GitHub PAT for cloning and PRs
+GITHUB_TOKEN=ghp_...              # GitHub PAT for cloning and PRs (also used at build time)
 ```
+
+> **Note:** `GITHUB_TOKEN` must be set as both a **build variable** and **runtime variable** in Railway. It's used at build time to clone the private `hivemind-claude-code-setup` repo, and at runtime for creating PRs.
 
 **Optional (Slack integration):**
 ```
