@@ -1,22 +1,44 @@
-import type { SandboxInstance, PRResult } from "./types";
+import { $ } from "bun";
+import type { PRResult } from "./types";
 
 interface CreatePRParams {
-  sandbox: SandboxInstance;
+  workspace: string;
   repoDir: string;
   repoUrl: string;
   branchName: string;
   githubToken: string;
 }
 
+// Run shell command in workspace
+async function exec(
+  cmd: string,
+  cwd: string
+): Promise<{ success: boolean; stdout: string; stderr: string }> {
+  try {
+    const result = await $`${{ raw: cmd }}`.cwd(cwd).quiet();
+    return {
+      success: result.exitCode === 0,
+      stdout: result.stdout.toString(),
+      stderr: result.stderr.toString(),
+    };
+  } catch (error: unknown) {
+    const e = error as { stdout?: Buffer; stderr?: Buffer };
+    return {
+      success: false,
+      stdout: e.stdout?.toString() || "",
+      stderr: e.stderr?.toString() || String(error),
+    };
+  }
+}
+
 export async function createPullRequest(
   params: CreatePRParams
 ): Promise<PRResult> {
-  const { sandbox, repoDir, repoUrl, branchName, githubToken } = params;
+  const { workspace, repoDir, repoUrl, branchName, githubToken } = params;
+  const repoPath = `${workspace}/${repoDir}`;
 
   // Check if there are commits ahead of origin/main
-  const logResult = await sandbox.exec(
-    `(cd ${repoDir} && git log origin/main..HEAD --oneline)`
-  );
+  const logResult = await exec("git log origin/main..HEAD --oneline", repoPath);
 
   const hasNewCommits = logResult.success && logResult.stdout.trim().length > 0;
 
@@ -29,9 +51,7 @@ export async function createPullRequest(
   }
 
   // Push the branch
-  const pushResult = await sandbox.exec(
-    `(cd ${repoDir} && git push -u origin ${branchName})`
-  );
+  const pushResult = await exec(`git push -u origin ${branchName}`, repoPath);
 
   if (!pushResult.success) {
     return {
@@ -42,7 +62,7 @@ export async function createPullRequest(
   }
 
   // Extract owner/repo from URL
-  const match = repoUrl.match(/github\.com\/([^/]+)\/([^/]+)/);
+  const match = repoUrl.match(/github\.com\/([^/]+)\/([^/.]+)/);
   if (!match) {
     return {
       repoName: repoDir,
@@ -61,7 +81,7 @@ export async function createPullRequest(
         Authorization: `Bearer ${githubToken}`,
         Accept: "application/vnd.github+json",
         "Content-Type": "application/json",
-        "User-Agent": "Hivemind-Claude-Bot",
+        "User-Agent": "Claude-Code-Railway",
       },
       body: JSON.stringify({
         title: branchName,

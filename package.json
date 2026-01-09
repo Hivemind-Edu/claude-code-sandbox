@@ -1,26 +1,20 @@
 {
-	"name": "@cloudflare/sandbox-claude-code-example",
-	"version": "1.0.0",
-	"type": "module",
-	"private": true,
-	"description": "A minimal example of using the Claude Code with Sandbox SDK",
-	"scripts": {
-		"deploy": "wrangler deploy",
-		"dev": "wrangler dev",
-		"start": "wrangler dev",
-		"types": "wrangler types",
-		"typecheck": "tsc --noEmit"
-	},
-	"devDependencies": {
-		"@cloudflare/sandbox": "*",
-		"@types/node": "^24.10.4",
-		"typescript": "^5.9.3",
-		"wrangler": "^4.58.0"
-	},
-	"author": "",
-	"license": "MIT",
-	"dependencies": {
-		"@ai-sdk/google": "^3.0.6",
-		"ai": "^6.0.22"
-	}
+  "name": "claude-code-railway",
+  "module": "src/index.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "bun run --hot src/index.ts",
+    "start": "bun run src/index.ts",
+    "typecheck": "bun x tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "hono": "^4.11.3"
+  }
 }

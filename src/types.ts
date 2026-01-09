@@ -1,24 +1,13 @@
-import type { getSandbox, Sandbox } from "@cloudflare/sandbox";
-import type { TaskRunner } from "./task-runner";
-
+// Environment variables
 export interface Env {
-  Sandbox: DurableObjectNamespace<Sandbox>;
-  TaskRunner: DurableObjectNamespace<TaskRunner>;
-  ANTHROPIC_API_KEY: string;
   GITHUB_TOKEN: string;
-  GOOGLE_GENERATIVE_AI_API_KEY: string;
-  SLACK_BOT_TOKEN: string;
-  SLACK_SIGNING_SECRET?: string;
+  SLACK_BOT_TOKEN: string; // Optional - falls back to console notifier if empty
+  FRONTEND_REPO: string;
+  BACKEND_REPO: string;
+  PORT: string;
 }
 
-export type SandboxInstance = ReturnType<typeof getSandbox>;
-
-export interface CmdOutput {
-  success: boolean;
-  stdout: string;
-  stderr: string;
-}
-
+// Result of creating a PR
 export interface PRResult {
   repoName: string;
   success: boolean;
@@ -26,15 +15,21 @@ export interface PRResult {
   error?: string;
 }
 
+// Result of running a task
 export interface TaskResult {
   branchName: string;
   claudeSuccess: boolean;
   claudeError?: string;
   claudeMessage: string;
-  claudeSessionId?: string; // For conversation continuity with --resume
+  claudeSessionId?: string;
   frontend: PRResult;
   backend: PRResult;
 }
 
-export const FRONTEND_REPO = "https://github.com/Hivemind-Edu/hivemind-expo";
-export const BACKEND_REPO = "https://github.com/Hivemind-Edu/hivemind-hono";
+// Command execution result
+export interface ExecResult {
+  success: boolean;
+  stdout: string;
+  stderr: string;
+  exitCode: number;
+}

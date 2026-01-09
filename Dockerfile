@@ -1,30 +1,49 @@
-FROM docker.io/cloudflare/sandbox:0.6.10
+FROM node:24
 
-# Install system packages (postgresql-client, redis-cli)
+ARG TZ
+ENV TZ="$TZ"
+ENV IS_SANDBOX=1
+
+ARG CLAUDE_CODE_VERSION=latest
+
+# Install basic development tools and iptables/ipset
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    postgresql-client \
-    redis-tools \
-    unzip \
-    openjdk-17-jdk-headless \
-    && rm -rf /var/lib/apt/lists/*
+  less \
+  git \
+  procps \
+  sudo \
+  fzf \
+  zsh \
+  man-db \
+  unzip \
+  gnupg2 \
+  gh \
+  iptables \
+  ipset \
+  iproute2 \
+  dnsutils \
+  aggregate \
+  jq \
+  nano \
+  vim \
+  && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Install Bun (https://bun.sh/docs/installation)
+# Install Claude CLI
+RUN curl -fsSL https://claude.ai/install.sh | bash
+ENV PATH="/root/.local/bin:$PATH"
+
+# Claude config directory (mount Railway volume here)
+RUN mkdir -p /claude-config
+ENV CLAUDE_CONFIG_DIR="/claude-config"
+
+# Install bun
 RUN curl -fsSL https://bun.sh/install | bash
-ENV BUN_INSTALL="/root/.bun"
-ENV PATH="$BUN_INSTALL/bin:$PATH"
+ENV PATH="/root/.bun/bin:$PATH"
 
-# Install Maestro (https://maestro.mobile.dev/getting-started/installing-maestro)
-# Requires Java 11+ (installed above)
-RUN curl -Ls "https://get.maestro.mobile.dev" | bash
-ENV PATH="/root/.maestro/bin:$PATH"
+WORKDIR /app
+COPY package.json bun.lock ./
+RUN bun install
 
-# Install Railway CLI (https://docs.railway.app/guides/cli)
-RUN curl -fsSL https://railway.app/install.sh | sh
-ENV PATH="/root/.railway/bin:$PATH"
+COPY . .
 
-# Install Claude Code
-RUN npm install -g @anthropic-ai/claude-code
-
-# 20 minutes timeout for Claude tasks
-ENV COMMAND_TIMEOUT_MS=1200000
-EXPOSE 3000
+CMD ["bun", "run", "src/index.ts"]
