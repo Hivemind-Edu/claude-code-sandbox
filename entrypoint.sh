@@ -6,7 +6,7 @@
 
 set -e
 
-MCP_CONFIGURED_FLAG="/claude-config/.mcp-configured-v3"
+MCP_CONFIGURED_FLAG="/claude-config/.mcp-configured-v4"
 
 configure_mcps() {
     echo "[Entrypoint] Configuring MCP servers..."
@@ -14,6 +14,7 @@ configure_mcps() {
     # Remove old MCP configs to ensure fresh setup
     claude mcp remove sentry 2>/dev/null || true
     claude mcp remove expo-mcp 2>/dev/null || true
+    claude mcp remove expo 2>/dev/null || true
     claude mcp remove posthog 2>/dev/null || true
 
     # Sentry MCP - Use official @sentry/mcp-server package (STDIO transport)
@@ -29,18 +30,10 @@ configure_mcps() {
         fi
     fi
 
-    # Expo MCP - Use community expo-mcp-server package (STDIO transport)
-    # The HTTP endpoint at mcp.expo.dev is OAuth-only, won't work headless
-    if ! claude mcp list 2>/dev/null | grep -q "expo"; then
-        if [ -n "$EXPO_TOKEN" ]; then
-            echo "[Entrypoint] Adding Expo MCP (expo-mcp-server)..."
-            claude mcp add expo -- npx -y expo-mcp-server || true
-        else
-            # Still add it - some features work without auth
-            echo "[Entrypoint] Adding Expo MCP (expo-mcp-server, no token)..."
-            claude mcp add expo -- npx -y expo-mcp-server || true
-        fi
-    fi
+    # Expo MCP - HTTP transport requires OAuth (browser login)
+    # Won't work in headless containers without pre-authenticated session
+    # Skipping in Railway - use Context7 for Expo docs instead
+    echo "[Entrypoint] Skipping Expo MCP (requires OAuth browser login)"
 
     # Context7 MCP (for documentation lookups)
     if ! claude mcp list 2>/dev/null | grep -q "context7"; then
@@ -48,12 +41,14 @@ configure_mcps() {
         claude mcp add context7 -- npx -y @upstash/context7-mcp || true
     fi
 
-    # PostHog MCP - Use /sse endpoint with mcp-remote
-    # Note: POSTHOG_AUTH_HEADER must include "Bearer " prefix
+    # PostHog MCP - Use mcp-remote with Streamable HTTP endpoint
+    # Note: POSTHOG_AUTH_HEADER must include "Bearer " prefix (e.g., "Bearer phx_...")
+    # API key must have "MCP Server" preset permissions from PostHog settings
+    # EU cloud users: mcp.posthog.com won't work - need self-hosted MCP
     if ! claude mcp list 2>/dev/null | grep -q "posthog"; then
         if [ -n "$POSTHOG_AUTH_HEADER" ]; then
             echo "[Entrypoint] Adding PostHog MCP..."
-            claude mcp add posthog -- npx -y mcp-remote@latest https://mcp.posthog.com/sse \
+            claude mcp add posthog -- npx -y mcp-remote@latest https://mcp.posthog.com/mcp \
                 --header "Authorization:\${POSTHOG_AUTH_HEADER}" || true
         else
             echo "[Entrypoint] Skipping PostHog MCP (POSTHOG_AUTH_HEADER not set)"
