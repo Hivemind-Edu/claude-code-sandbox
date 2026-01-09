@@ -6,29 +6,40 @@
 
 set -e
 
-MCP_CONFIGURED_FLAG="/claude-config/.mcp-configured-v2"
+MCP_CONFIGURED_FLAG="/claude-config/.mcp-configured-v3"
 
 configure_mcps() {
     echo "[Entrypoint] Configuring MCP servers..."
 
     # Remove old MCP configs to ensure fresh setup
     claude mcp remove sentry 2>/dev/null || true
+    claude mcp remove expo-mcp 2>/dev/null || true
+    claude mcp remove posthog 2>/dev/null || true
 
-    # Sentry MCP (requires SENTRY_AUTH_TOKEN env var)
+    # Sentry MCP - Use official @sentry/mcp-server package (STDIO transport)
+    # The HTTP endpoint at mcp.sentry.dev is OAuth-only, won't work headless
     if ! claude mcp list 2>/dev/null | grep -q "sentry"; then
         if [ -n "$SENTRY_AUTH_TOKEN" ]; then
-            echo "[Entrypoint] Adding Sentry MCP..."
-            claude mcp add sentry -- npx -y mcp-remote@latest https://mcp.sentry.dev/mcp \
-                --header "Authorization:Bearer \${SENTRY_AUTH_TOKEN}" || true
+            echo "[Entrypoint] Adding Sentry MCP (@sentry/mcp-server)..."
+            # Export as SENTRY_ACCESS_TOKEN which the package expects
+            export SENTRY_ACCESS_TOKEN="$SENTRY_AUTH_TOKEN"
+            claude mcp add sentry -- npx -y @sentry/mcp-server@latest || true
         else
             echo "[Entrypoint] Skipping Sentry MCP (SENTRY_AUTH_TOKEN not set)"
         fi
     fi
 
-    # Expo MCP (HTTP transport)
-    if ! claude mcp list 2>/dev/null | grep -q "expo-mcp"; then
-        echo "[Entrypoint] Adding Expo MCP..."
-        claude mcp add --transport http expo-mcp https://mcp.expo.dev/mcp || true
+    # Expo MCP - Use community expo-mcp-server package (STDIO transport)
+    # The HTTP endpoint at mcp.expo.dev is OAuth-only, won't work headless
+    if ! claude mcp list 2>/dev/null | grep -q "expo"; then
+        if [ -n "$EXPO_TOKEN" ]; then
+            echo "[Entrypoint] Adding Expo MCP (expo-mcp-server)..."
+            claude mcp add expo -- npx -y expo-mcp-server || true
+        else
+            # Still add it - some features work without auth
+            echo "[Entrypoint] Adding Expo MCP (expo-mcp-server, no token)..."
+            claude mcp add expo -- npx -y expo-mcp-server || true
+        fi
     fi
 
     # Context7 MCP (for documentation lookups)
@@ -37,11 +48,12 @@ configure_mcps() {
         claude mcp add context7 -- npx -y @upstash/context7-mcp || true
     fi
 
-    # PostHog MCP (requires POSTHOG_AUTH_HEADER env var at runtime)
+    # PostHog MCP - Use /sse endpoint with mcp-remote
+    # Note: POSTHOG_AUTH_HEADER must include "Bearer " prefix
     if ! claude mcp list 2>/dev/null | grep -q "posthog"; then
         if [ -n "$POSTHOG_AUTH_HEADER" ]; then
             echo "[Entrypoint] Adding PostHog MCP..."
-            claude mcp add posthog -- npx -y mcp-remote@latest https://mcp.posthog.com/mcp \
+            claude mcp add posthog -- npx -y mcp-remote@latest https://mcp.posthog.com/sse \
                 --header "Authorization:\${POSTHOG_AUTH_HEADER}" || true
         else
             echo "[Entrypoint] Skipping PostHog MCP (POSTHOG_AUTH_HEADER not set)"
