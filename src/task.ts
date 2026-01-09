@@ -6,6 +6,9 @@ import { createPullRequest } from "./github";
 // Workspaces directory
 const WORKSPACES_DIR = "/tmp/workspaces";
 
+// Path to CLAUDE.md templates (installed from hivemind-claude-code-setup)
+const CLAUDE_SETUP_DIR = "/opt/claude-setup";
+
 // System prompt for Claude
 const SYSTEM_PROMPT = `You are an autonomous developer working on Hivemind, a learning app with a social media-style interface.
 
@@ -13,7 +16,31 @@ const SYSTEM_PROMPT = `You are an autonomous developer working on Hivemind, a le
 - Frontend: ./hivemind-expo (React Native/Expo)
 - Backend: ./hivemind-hono (Hono API on Bun)
 
-Both repos have READMEs with more details. The frontend calls the backend via REST API with RPC-style endpoints.
+**IMPORTANT**: Each repo contains a CLAUDE.md file with detailed project context, architecture, coding standards, and development guidelines. READ THE CLAUDE.md FILE FIRST before making any changes.
+
+## Available Tools
+
+You have access to specialized agents and MCP servers:
+
+### Agents (invoke via Task tool)
+- @sentry-investigator - Fetch and analyze Sentry errors, trace to source code
+- @grand-architect - Plan complex features, orchestrate multi-step tasks
+- @a11y-enforcer - Check accessibility compliance
+- @design-token-guardian - Enforce design system (no hardcoded colors)
+- @security-specialist - Security audits
+- @test-generator - Generate tests with ROI prioritization
+
+### MCP Servers
+- Sentry - Fetch production errors, stack traces, user impact
+- PostHog - Analytics, feature flags, experiments
+- Context7 - Up-to-date library documentation
+- Expo - Expo/React Native documentation
+
+### Slash Commands
+- /debug-sentry - Investigate Sentry issues
+- /review - Code review for security, a11y, performance
+- /why - Pre-flight checklist before building
+- /test - Generate tests
 
 ## Git Rules
 - You are on branch "{BRANCH_NAME}" in both repos. NEVER switch branches.
@@ -21,17 +48,19 @@ Both repos have READMEs with more details. The frontend calls the backend via RE
 - The system will automatically push and create PRs after you complete.
 
 ## Workflow
-1. Read the READMEs to understand the codebase structure
-2. Make the necessary changes across frontend and/or backend
-3. Install dependencies if needed (bun install)
-4. Run linting/formatting (fix any issues)
-5. Run tests (fix any failures)
-6. Commit your changes with a clear message
+1. READ the CLAUDE.md in each repo to understand the codebase
+2. If investigating errors, use Sentry MCP to fetch real data
+3. Make the necessary changes across frontend and/or backend
+4. Follow the coding standards in CLAUDE.md (design tokens, a11y, etc.)
+5. Run linting/formatting (fix any issues)
+6. Run tests (fix any failures)
+7. Commit your changes with a clear message
 
 ## Important
 - Do NOT ask clarifying questions. Make your best judgment and proceed.
 - Do NOT wait for approval. Complete the entire task autonomously.
 - If something is ambiguous, make a reasonable decision and document it in the commit message.
+- Use the specialized agents when appropriate (e.g., @sentry-investigator for errors)
 - At the end, provide a brief summary of what you did.`;
 
 // Generate branch name from task
@@ -148,6 +177,30 @@ async function setupWorkspace(
     `https://oauth2:${env.GITHUB_TOKEN}@`
   );
   await exec(`git clone --depth 1 ${backendUrl} hivemind-hono`, workspace);
+
+  // Inject CLAUDE.md templates for project context
+  console.log("[Task] Injecting CLAUDE.md templates...");
+  const expoTemplate = `${CLAUDE_SETUP_DIR}/templates/CLAUDE.md.expo`;
+  const baseTemplate = `${CLAUDE_SETUP_DIR}/templates/CLAUDE.md.base`;
+
+  // Frontend gets the expo-specific template
+  if (await exists(expoTemplate)) {
+    await exec(`cp ${expoTemplate} hivemind-expo/CLAUDE.md`, workspace);
+    console.log("[Task] Injected CLAUDE.md into hivemind-expo");
+  } else if (await exists(baseTemplate)) {
+    await exec(`cp ${baseTemplate} hivemind-expo/CLAUDE.md`, workspace);
+    console.log("[Task] Injected base CLAUDE.md into hivemind-expo");
+  }
+
+  // Backend gets the base template (or backend-specific if available)
+  const backendTemplate = `${CLAUDE_SETUP_DIR}/templates/CLAUDE.md.hono`;
+  if (await exists(backendTemplate)) {
+    await exec(`cp ${backendTemplate} hivemind-hono/CLAUDE.md`, workspace);
+    console.log("[Task] Injected CLAUDE.md into hivemind-hono");
+  } else if (await exists(baseTemplate)) {
+    await exec(`cp ${baseTemplate} hivemind-hono/CLAUDE.md`, workspace);
+    console.log("[Task] Injected base CLAUDE.md into hivemind-hono");
+  }
 
   // Setup branches
   console.log(`[Task] Setting up branch: ${branchName}`);

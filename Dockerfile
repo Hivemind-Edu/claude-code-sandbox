@@ -32,13 +32,25 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN curl -fsSL https://claude.ai/install.sh | bash
 ENV PATH="/root/.local/bin:$PATH"
 
-# Claude config directory (mount Railway volume here)
+# Claude config directory (mount Railway volume here for credentials)
 RUN mkdir -p /claude-config
 ENV CLAUDE_CONFIG_DIR="/claude-config"
+
+# Install uv/uvx for langfuse MCP
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+ENV PATH="/root/.local/bin:$PATH"
 
 # Install bun
 RUN curl -fsSL https://bun.sh/install | bash
 ENV PATH="/root/.bun/bin:$PATH"
+
+# Clone hivemind-claude-code-setup for agents, commands, and templates
+RUN git clone --depth 1 https://github.com/Hivemind-Edu/hivemind-claude-code-setup.git \
+    /opt/claude-setup
+
+# Install agents and commands to /root/.claude/ (persists in image)
+# Using --update to skip MCP installation (MCPs configured at runtime)
+RUN cd /opt/claude-setup && ./install.sh --update --full
 
 WORKDIR /app
 COPY package.json bun.lock ./
@@ -46,4 +58,9 @@ RUN bun install
 
 COPY . .
 
+# Copy entrypoint script
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+ENTRYPOINT ["/entrypoint.sh"]
 CMD ["bun", "run", "src/index.ts"]
