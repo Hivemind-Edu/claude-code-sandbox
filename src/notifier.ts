@@ -56,7 +56,10 @@ export class SlackNotifier implements Notifier {
 
   async onTaskComplete(result: TaskResult): Promise<void> {
     await this.addReaction("white_check_mark");
-    await this.postMessage(this.formatResult(result));
+    const messages = this.formatResult(result);
+    for (const message of messages) {
+      await this.postMessage(message);
+    }
   }
 
   async onTaskError(error: Error): Promise<void> {
@@ -106,10 +109,11 @@ export class SlackNotifier implements Notifier {
     }
   }
 
-  private formatResult(result: TaskResult): string {
-    const lines: string[] = [];
+  private formatResult(result: TaskResult): string[] {
+    const messages: string[] = [];
 
-    // PRs at the top (most important)
+    // First message: PRs at the top (most important)
+    const headerLines: string[] = [];
     const prs: string[] = [];
     if (result.frontend.success && result.frontend.prUrl) {
       prs.push(`<${result.frontend.prUrl}|Frontend PR>`);
@@ -118,33 +122,74 @@ export class SlackNotifier implements Notifier {
       prs.push(`<${result.backend.prUrl}|Backend PR>`);
     }
     if (prs.length > 0) {
-      lines.push(`🔗 ${prs.join(" • ")}`);
-      lines.push("");
+      headerLines.push(`🔗 ${prs.join(" • ")}`);
     }
 
     // Error message if failed
     if (!result.claudeSuccess && result.claudeError) {
-      lines.push(`❌ ${result.claudeError}`);
-      lines.push("");
+      headerLines.push(`❌ ${result.claudeError}`);
     }
 
-    // Claude's full message
+    // Add header as first message if it exists
+    if (headerLines.length > 0) {
+      messages.push(headerLines.join("\n"));
+    }
+
+    // Claude's full message - split into chunks
     if (result.claudeMessage?.trim()) {
-      lines.push(result.claudeMessage.trim());
+      const chunks = this.splitIntoChunks(result.claudeMessage.trim());
+      messages.push(...chunks);
     }
 
-    let text = lines.join("\n").trim() || "No output.";
+    return messages.length > 0 ? messages : ["No output."];
+  }
 
-    // Slack has ~4000 char limit - truncate from beginning, keep end
-    const SLACK_LIMIT = 3800; // Leave some buffer
-    if (text.length > SLACK_LIMIT) {
-      const truncated = text.slice(-SLACK_LIMIT);
-      // Find first newline to avoid cutting mid-line
-      const firstNewline = truncated.indexOf("\n");
-      text = `... (truncated)\n\n${truncated.slice(firstNewline + 1)}`;
+  // Split long text into Slack-friendly chunks at line boundaries
+  private splitIntoChunks(text: string): string[] {
+    const SLACK_LIMIT = 3800;
+
+    if (text.length <= SLACK_LIMIT) {
+      return [text];
     }
 
-    return text;
+    const chunks: string[] = [];
+    const lines = text.split("\n");
+    let currentChunk = "";
+
+    for (const line of lines) {
+      // If adding this line would exceed limit, save current chunk and start new one
+      if (currentChunk.length + line.length + 1 > SLACK_LIMIT) {
+        if (currentChunk) {
+          chunks.push(currentChunk.trim());
+        }
+        // If single line is too long, split it
+        if (line.length > SLACK_LIMIT) {
+          const lineChunks = this.splitLongLine(line, SLACK_LIMIT);
+          chunks.push(...lineChunks.slice(0, -1));
+          currentChunk = lineChunks[lineChunks.length - 1] + "\n";
+        } else {
+          currentChunk = line + "\n";
+        }
+      } else {
+        currentChunk += line + "\n";
+      }
+    }
+
+    // Don't forget the last chunk
+    if (currentChunk.trim()) {
+      chunks.push(currentChunk.trim());
+    }
+
+    return chunks;
+  }
+
+  // Split a single long line into chunks
+  private splitLongLine(line: string, limit: number): string[] {
+    const chunks: string[] = [];
+    for (let i = 0; i < line.length; i += limit) {
+      chunks.push(line.slice(i, i + limit));
+    }
+    return chunks;
   }
 }
 
