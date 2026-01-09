@@ -6,15 +6,23 @@
 
 set -e
 
-MCP_CONFIGURED_FLAG="/claude-config/.mcp-configured"
+MCP_CONFIGURED_FLAG="/claude-config/.mcp-configured-v2"
 
 configure_mcps() {
     echo "[Entrypoint] Configuring MCP servers..."
 
-    # Sentry MCP (HTTP transport - no auth needed at config time)
+    # Remove old MCP configs to ensure fresh setup
+    claude mcp remove sentry 2>/dev/null || true
+
+    # Sentry MCP (requires SENTRY_AUTH_TOKEN env var)
     if ! claude mcp list 2>/dev/null | grep -q "sentry"; then
-        echo "[Entrypoint] Adding Sentry MCP..."
-        claude mcp add --transport http sentry https://mcp.sentry.dev/mcp || true
+        if [ -n "$SENTRY_AUTH_TOKEN" ]; then
+            echo "[Entrypoint] Adding Sentry MCP..."
+            claude mcp add sentry -- npx -y mcp-remote@latest https://mcp.sentry.dev/mcp \
+                --header "Authorization:Bearer \${SENTRY_AUTH_TOKEN}" || true
+        else
+            echo "[Entrypoint] Skipping Sentry MCP (SENTRY_AUTH_TOKEN not set)"
+        fi
     fi
 
     # Expo MCP (HTTP transport)
