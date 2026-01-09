@@ -59,6 +59,10 @@
 			{
 				"class_name": "Sandbox",
 				"name": "Sandbox"
+			},
+			{
+				"class_name": "TaskRunner",
+				"name": "TaskRunner"
 			}
 		]
 	},
@@ -68,6 +72,12 @@
 				"Sandbox"
 			],
 			"tag": "v1"
+		},
+		{
+			"new_classes": [
+				"TaskRunner"
+			],
+			"tag": "v2"
 		}
 	]
 	/**

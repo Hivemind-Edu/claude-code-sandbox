@@ -1,7 +1,9 @@
-import type { getSandbox } from "@cloudflare/sandbox";
+import type { getSandbox, Sandbox } from "@cloudflare/sandbox";
+import type { TaskRunner } from "./task-runner";
 
 export interface Env {
-  Sandbox: DurableObjectNamespace;
+  Sandbox: DurableObjectNamespace<Sandbox>;
+  TaskRunner: DurableObjectNamespace<TaskRunner>;
   ANTHROPIC_API_KEY: string;
   GITHUB_TOKEN: string;
   GOOGLE_GENERATIVE_AI_API_KEY: string;
@@ -26,7 +28,10 @@ export interface PRResult {
 
 export interface TaskResult {
   branchName: string;
+  claudeSuccess: boolean;
+  claudeError?: string;
   claudeMessage: string;
+  claudeSessionId?: string; // For conversation continuity with --resume
   frontend: PRResult;
   backend: PRResult;
 }

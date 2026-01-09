@@ -59,7 +59,13 @@ export async function addReaction(
 export function formatResult(result: TaskResult): string {
   const lines: string[] = [];
 
-  // PRs at the top
+  // Show error if Claude failed
+  if (!result.claudeSuccess && result.claudeError) {
+    lines.push(`❌ ${result.claudeError}`);
+    lines.push("");
+  }
+
+  // PRs
   const prs: string[] = [];
   if (result.frontend.success && result.frontend.prUrl) {
     prs.push(`<${result.frontend.prUrl}|Frontend PR>`);
@@ -67,25 +73,25 @@ export function formatResult(result: TaskResult): string {
   if (result.backend.success && result.backend.prUrl) {
     prs.push(`<${result.backend.prUrl}|Backend PR>`);
   }
-
   if (prs.length > 0) {
-    lines.push(`🔗 *Pull Requests:* ${prs.join(" • ")}`);
+    lines.push(`🔗 ${prs.join(" • ")}`);
     lines.push("");
   }
 
   // Claude's message
-  lines.push(result.claudeMessage);
+  if (result.claudeMessage?.trim()) {
+    lines.push(result.claudeMessage.trim());
+  }
 
-  return lines.join("\n");
+  return lines.join("\n").trim() || "No output.";
 }
 
 // Format error for Slack
 export function formatError(error: Error, claudeOutput?: string): string {
-  const lines = [`❌ *Error:* ${error.message}`];
+  const lines = [`❌ ${error.message}`];
 
   if (claudeOutput) {
     lines.push("");
-    lines.push("*Last Claude output:*");
     lines.push("```");
     lines.push(claudeOutput.slice(-500));
     lines.push("```");

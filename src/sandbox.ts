@@ -42,7 +42,7 @@ function extractClaudeMessage(logs: string): string {
   const lines = logs.trim().split("\n");
 
   // Find the last block of text (after last empty line or separator)
-  let lastBlock: string[] = [];
+  const lastBlock: string[] = [];
   for (let i = lines.length - 1; i >= 0; i--) {
     const line = lines[i];
     if (line.trim() === "" && lastBlock.length > 0) {
@@ -128,11 +128,59 @@ Both repos have READMEs with more details. The frontend calls the backend via RE
   console.log("[runTask] Running Claude...");
   const escapedTask = task.replace(/"/g, '\\"');
   const escapedSystem = systemPrompt.replace(/"/g, '\\"');
-  const cmd = `claude --system-prompt "${escapedSystem}" -p "${escapedTask}" --dangerously-skip-permissions`;
 
-  const result = await sandbox.exec(cmd);
-  const claudeLogs = result.success ? result.stdout : result.stderr;
-  const claudeMessage = extractClaudeMessage(claudeLogs);
+  // CLI options based on https://code.claude.com/docs/en/cli-reference
+  const claudeCmd = [
+    "claude",
+    `-p "${escapedTask}"`,
+    `--append-system-prompt "${escapedSystem}"`,
+    "--max-turns 50", // Prevent infinite loops, allow complex tasks
+    "--verbose", // Human-readable turn-by-turn output
+    "--dangerously-skip-permissions", // Auto-approve all tools
+  ].join(" ");
+
+  // Stream Claude output in real-time for observability
+  // https://developers.cloudflare.com/sandbox/api/commands/
+  let stdoutBuffer = "";
+  let stderrBuffer = "";
+
+  const result = await sandbox.exec(claudeCmd, {
+    timeout: 20 * 60 * 1000, // 20 minutes - match Dockerfile COMMAND_TIMEOUT_MS
+    stream: true,
+    onOutput: (stream, data) => {
+      if (stream === "stdout") {
+        stdoutBuffer += data;
+        // Log each line as it comes (verbose mode outputs human-readable text)
+        const lines = data.split("\n").filter((l: string) => l.trim());
+        for (const line of lines) {
+          console.log("[Claude]", line.slice(0, 500)); // Show more of each line
+        }
+      } else {
+        stderrBuffer += data;
+        console.error("[Claude stderr]", data.slice(0, 500));
+      }
+    },
+  });
+
+  // Use buffered output (streaming collects it)
+  const stdout = stdoutBuffer || result.stdout || "";
+  const stderr = stderrBuffer || result.stderr || "";
+  console.log("[runTask] Claude exit success:", result.success);
+
+  // Plain text verbose output (no JSON parsing needed)
+  const claudeOutput = stdout;
+  const sessionId: string | undefined = undefined; // TODO: Add --output-format json back later for session continuity
+
+  const claudeSuccess = result.success;
+  const claudeError = !result.success
+    ? claudeOutput || stderr || "Unknown error"
+    : undefined;
+  const claudeMessage = extractClaudeMessage(claudeOutput || stderr);
+
+  if (!claudeSuccess) {
+    console.error("[runTask] Claude failed:", claudeError || "Unknown error");
+    console.error("[runTask] Continuing to check for any commits...");
+  }
 
   console.log("[runTask] Claude finished, creating PRs...");
 
@@ -153,8 +201,16 @@ Both repos have READMEs with more details. The frontend calls the backend via RE
   });
 
   console.log(
-    `[runTask] Done. Frontend: ${frontend.success}, Backend: ${backend.success}`
+    `[runTask] Done. Claude: ${claudeSuccess}, Frontend: ${frontend.success}, Backend: ${backend.success}`
   );
 
-  return { branchName, claudeMessage, frontend, backend };
+  return {
+    branchName,
+    claudeSuccess,
+    claudeError,
+    claudeMessage,
+    claudeSessionId: sessionId,
+    frontend,
+    backend,
+  };
 }

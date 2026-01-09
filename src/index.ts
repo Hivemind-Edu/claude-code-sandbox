@@ -7,7 +7,7 @@ export default {
   async fetch(
     request: Request,
     env: Env,
-    ctx: ExecutionContext
+    _ctx: ExecutionContext
   ): Promise<Response> {
     // Only accept POST
     if (request.method !== "POST") {
@@ -33,10 +33,9 @@ export default {
           body.type === "event_callback" &&
           body.event?.type === "app_mention"
         ) {
-          const { text, channel, ts, thread_ts, user } = body.event;
+          const { text, channel, ts, user } = body.event;
 
           // Extract task from message (remove bot mention)
-          // Bot user ID will be in format <@U12345>
           const task = text.replace(/<@[A-Z0-9]+>/g, "").trim();
 
           if (!task) {
@@ -62,45 +61,19 @@ export default {
             ts
           );
 
-          // Run task in background
-          ctx.waitUntil(
-            (async () => {
-              try {
-                const result = await runTask(task, env);
-
-                // Add checkmark reaction
-                await addReaction(
-                  env.SLACK_BOT_TOKEN,
-                  channel,
-                  ts,
-                  "white_check_mark"
-                );
-
-                // Post result in thread
-                await postMessage(
-                  env.SLACK_BOT_TOKEN,
-                  channel,
-                  formatResult(result),
-                  ts
-                );
-              } catch (error) {
-                console.error("[index] Task failed:", error);
-
-                // Add X reaction
-                await addReaction(env.SLACK_BOT_TOKEN, channel, ts, "x");
-
-                // Post error in thread
-                const errorMessage =
-                  error instanceof Error ? error.message : "Unknown error";
-                await postMessage(
-                  env.SLACK_BOT_TOKEN,
-                  channel,
-                  `❌ *Error:* ${errorMessage}`,
-                  ts
-                );
-              }
-            })()
+          // Run task in a Durable Object
+          const taskRunnerId = env.TaskRunner.idFromName(
+            `${channel}-${ts}-${Date.now()}`
           );
+          const taskRunner = env.TaskRunner.get(taskRunnerId);
+
+          // Start the task - DO returns immediately and runs in background
+          await taskRunner.run({
+            task,
+            channel,
+            ts,
+            slackToken: env.SLACK_BOT_TOKEN,
+          });
 
           return new Response("ok");
         }
@@ -126,3 +99,4 @@ export default {
 };
 
 export { Sandbox } from "@cloudflare/sandbox";
+export { TaskRunner } from "./task-runner";
