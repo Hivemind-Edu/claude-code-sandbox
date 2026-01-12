@@ -2,11 +2,46 @@
 #
 # Entrypoint script for claude-code-sandbox
 # Configures MCP servers on first run (they persist in /claude-config volume)
+# Copies agents/commands from staging (volume mount overwrites build-time copies)
 #
 
 set -e
 
 MCP_CONFIGURED_FLAG="/claude-config/.mcp-configured-v4"
+STAGING_DIR="/opt/claude-staging"
+
+# Always sync agents and commands from staging (may be updated in new builds)
+sync_agents_and_commands() {
+    echo "[Entrypoint] Syncing agents and commands from staging..."
+
+    if [ -d "$STAGING_DIR" ]; then
+        # Copy agents if they exist
+        if [ -d "$STAGING_DIR/agents" ]; then
+            mkdir -p /claude-config/agents
+            cp -r "$STAGING_DIR/agents/"* /claude-config/agents/ 2>/dev/null || true
+            echo "[Entrypoint] Synced agents: $(ls /claude-config/agents/ 2>/dev/null | wc -l) files"
+        fi
+
+        # Copy commands if they exist
+        if [ -d "$STAGING_DIR/commands" ]; then
+            mkdir -p /claude-config/commands
+            cp -r "$STAGING_DIR/commands/"* /claude-config/commands/ 2>/dev/null || true
+            echo "[Entrypoint] Synced commands: $(ls /claude-config/commands/ 2>/dev/null | wc -l) files"
+        fi
+
+        # Copy any other config files (settings.json, etc.)
+        for file in "$STAGING_DIR"/*.json "$STAGING_DIR"/*.md; do
+            if [ -f "$file" ]; then
+                cp "$file" /claude-config/ 2>/dev/null || true
+            fi
+        done
+    else
+        echo "[Entrypoint] Warning: Staging directory not found at $STAGING_DIR"
+    fi
+}
+
+# Sync agents/commands on every startup (gets updates from new builds)
+sync_agents_and_commands
 
 configure_mcps() {
     echo "[Entrypoint] Configuring MCP servers..."

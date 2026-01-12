@@ -47,17 +47,19 @@ ENV PATH="/root/.bun/bin:$PATH"
 
 # Clone hivemind-claude-code-setup for agents, commands, and templates
 # Uses GITHUB_TOKEN build arg for private repo access
-# SETUP_VERSION: increment to bust cache when setup repo changes
-ARG SETUP_VERSION=2
 RUN git clone --depth 1 https://oauth2:${GITHUB_TOKEN}@github.com/Hivemind-Edu/hivemind-claude-code-setup.git \
     /opt/claude-setup
 
-# Install agents and commands
+# Install agents and commands to staging location
 # Using --update to skip MCP installation (MCPs configured at runtime)
-# install.sh writes to $HOME/.claude, but Claude uses CLAUDE_CONFIG_DIR
+# install.sh writes to $HOME/.claude - we stage it for runtime copy
+# (Can't copy to /claude-config here - Railway volume mount overwrites it)
+ARG SETUP_VERSION=3
 RUN cd /opt/claude-setup && ./install.sh --update --full \
-    && cp -r /root/.claude/* /claude-config/ \
-    && echo "Setup version: ${SETUP_VERSION}"
+    && mkdir -p /opt/claude-staging \
+    && cp -r /root/.claude/* /opt/claude-staging/ \
+    && echo "Setup version: ${SETUP_VERSION}" \
+    && ls -la /opt/claude-staging/
 
 WORKDIR /app
 COPY package.json bun.lock ./
