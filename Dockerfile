@@ -50,9 +50,11 @@ ENV PATH="/root/.bun/bin:$PATH"
 RUN git clone --depth 1 https://oauth2:${GITHUB_TOKEN}@github.com/Hivemind-Edu/hivemind-claude-code-setup.git \
     /opt/claude-setup
 
-# Install agents and commands to /root/.claude/ (persists in image)
+# Install agents and commands
 # Using --update to skip MCP installation (MCPs configured at runtime)
-RUN cd /opt/claude-setup && ./install.sh --update --full
+# install.sh writes to $HOME/.claude, but Claude uses CLAUDE_CONFIG_DIR
+RUN cd /opt/claude-setup && ./install.sh --update --full \
+    && cp -r /root/.claude/* /claude-config/ 2>/dev/null || true
 
 WORKDIR /app
 COPY package.json bun.lock ./
