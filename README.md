@@ -1,4 +1,19 @@
-# Claude Code Railway
+# ⚠️ DEPRECATED
+
+> **This repository has been deprecated and merged into [`hivemind-claude-code-setup`](https://github.com/Hivemind-Edu/hivemind-claude-code-setup).**
+>
+> The sandbox functionality now lives in the `sandbox/` directory of the setup repository, providing a unified workspace-centric architecture with:
+> - Declarative MCP configuration (`.mcp.json`)
+> - Dynamic repository configuration (`repos.json`)
+> - Simplified deployment (no build-time git clones)
+>
+> **For new deployments, use:** https://github.com/Hivemind-Edu/hivemind-claude-code-setup
+>
+> This repository is archived for historical reference only. No further updates will be made.
+
+---
+
+# Claude Code Railway (Archived)
 
 A Slack bot that uses Claude Code to autonomously make code changes across repositories.
 

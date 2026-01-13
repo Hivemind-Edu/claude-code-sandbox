@@ -1,0 +1,39 @@
+This repository has been deprecated.
+
+The sandbox functionality has been merged into:
+https://github.com/Hivemind-Edu/hivemind-claude-code-setup
+
+See the `sandbox/` directory in that repository for the current implementation.
+
+Migration PR: https://github.com/Hivemind-Edu/hivemind-claude-code-setup/pull/1
+
+## Why was this deprecated?
+
+The workspace-centric architecture consolidates 4 repositories into 3:
+
+Before:
+├── hivemind-claude-code-setup   (agents, commands, templates)
+├── claude-code-sandbox          (Slack bot, Docker deployment)
+├── hivemind-expo                (frontend)
+└── hivemind-hono                (backend)
+
+After:
+├── hivemind-claude-code-setup
+│   ├── .mcp.json                (declarative MCP config)
+│   ├── .claude/                 (agents, commands)
+│   ├── repos.json               (dynamic repo config)
+│   └── sandbox/                 (merged bot code)
+├── hivemind-expo
+└── hivemind-hono
+
+## Key improvements
+
+1. Declarative MCP configuration via `.mcp.json` (Claude auto-discovery)
+2. Dynamic repository configuration via `repos.json`
+3. Unified CLAUDE.md at workspace root
+4. Simpler Docker build (no git clone at build time)
+5. Single source of truth for agents, commands, and templates
+
+## Questions?
+
+Reach out to the team or open an issue in the new repository.
